@@ -1,1 +1,1712 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Getränkeliste Dartverein</title>
+    <!-- Add this to your HTML <head> if not already included -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs -->
+    <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+  import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDHLWG8yxeVkvjY6yiwOEZd4IbjRcHSsNA",
+    authDomain: "verzehrlistedoppel1.firebaseapp.com",
+    projectId: "verzehrlistedoppel1",
+    storageBucket: "verzehrlistedoppel1.firebasestorage.app",
+    messagingSenderId: "927389587511",
+    appId: "1:927389587511:web:3221b0bd1219462d53c7b2"
+  };
+
+  const app = initializeApp(firebaseConfig);
+
+  // Make Firebase services globally available
+  window.firebase = {
+    app,
+    getAuth,
+    signInAnonymously,
+    getFirestore,
+    doc,
+    setDoc,
+    getDoc
+  };
+</script>
+
+    <style>
+.line-through {
+    text-decoration: line-through;
+}
+.opacity-60 {
+    opacity: 0.6;
+}
+.text-gray-400 {
+    color: #9CA3AF;
+}
+
+        body {
+            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF7; /* Warmes, fast weißes Beige */
+            padding-bottom: 80px; /* Platz für die feste Fußzeile */
+        }
+        .background-logo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://doppel1.de/images/Vereinslogo%20DSC%20Doppel1%20Pro.png');
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: contain;
+            opacity: 0.05;
+            z-index: -1;
+        }
+        #app-container {
+            max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        #tab-wrapper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.tab-button {
+    flex: 1 1 30%;
+    min-width: 100px;
+    text-align: center;
+}
+        .tab-active {
+            background-color: #4A5568; /* Slate 700 */
+            color: white;
+        }
+        .tab-inactive {
+            background-color: #E2E8F0; /* Slate 200 */
+            color: #4A5568; /* Slate 700 */
+        }
+        .btn-primary {
+            background-color: #4A5568;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .btn-primary:hover {
+            background-color: #2D3748;
+        }
+        .btn-secondary {
+            background-color: #A0AEC0;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .btn-secondary:hover {
+            background-color: #718096;
+        }
+        .btn-success {
+            background-color: #48BB78;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #F56565;
+            color: white;
+        }
+        .btn-warn {
+            background-color: #F6AD55;
+            color: white;
+        }
+        .btn-warn:hover {
+            background-color: #DD6B20;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 1px solid #E2E8F0;
+        }
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        .loading-overlay.hidden-fade {
+            opacity: 0;
+            visibility: hidden;
+        }
+        .save-message {
+            position: fixed;
+            bottom: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 1001;
+            opacity: 0;
+            transition: opacity 0.5s ease-in-out;
+        }
+        .save-message.show {
+            opacity: 1;
+        }
+        /* Fixed Footer for buttons */
+        .fixed-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #FDFBF7;
+            padding: 15px 0;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+        }
+        /* Admin Login Modal */
+        .admin-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+        .admin-modal-overlay.show-modal {
+            opacity: 1;
+            visibility: visible;
+        }
+        .admin-modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+
+        /* Reset Modal Styles */
+.reset-modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+.reset-modal-content {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  max-width: 300px;
+  width: 90%;
+  text-align: center;
+}
+.reset-option-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background-color: #4A5568; /* Dark slate */
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+.reset-option-btn:hover { background-color: #2D3748; }
+
+/* Improved confirm dialog buttons */
+.swal2-confirm, .swal2-cancel {
+  background-color: #4A5568 !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 5px !important;
+}
+.swal2-cancel { background-color: #A0AEC0 !important; }
+.swal2-confirm:hover { background-color: #2D3748 !important; }
+.swal2-cancel:hover { background-color: #718096 !important; }
+
+        /* Styles for the printable summary */
+        @media print {
+            body {
+                padding: 0;
+                margin: 0;
+                background-color: white;
+            }
+            .fixed-footer, #app-container, .loading-overlay, .save-message, .background-logo, .admin-modal-overlay {
+                display: none !important;
+            }
+            .print-container {
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                box-shadow: none;
+                border: none;
+            }
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            .print-table th, .print-table td {
+                border: 1px solid #ccc;
+                padding: 8px;
+                text-align: left;
+            }
+            .print-table th {
+                background-color: #f2f2f2;
+            }
+            .print-total {
+                text-align: right;
+                margin-top: 20px;
+                font-size: 1.2em;
+                font-weight: bold;
+            }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+    <!-- Hintergrundlogo-Container -->
+    <div class="background-logo"></div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <p class="text-xl font-semibold text-gray-700">Lade Daten...</p>
+    </div>
+
+    <!-- Save Message -->
+    <div class="save-message" id="save-message">
+        Gespeichert!
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div class="admin-modal-overlay" id="admin-login-modal">
+        <div class="admin-modal-content">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Admin-Login</h2>
+            <p class="text-gray-600 mb-6">Bitte geben Sie das Administrator-Passwort ein.</p>
+            <input type="password" id="admin-password-input" class="w-full p-3 border border-gray-300 rounded-md mb-4 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Passwort">
+            <div class="flex justify-center space-x-4">
+                <button id="admin-modal-login-btn" class="btn-primary px-6 py-2 rounded-md font-semibold">Anmelden</button>
+                <button id="admin-modal-cancel-btn" class="btn-secondary px-6 py-2 rounded-md font-semibold">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div id="app-container" class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 flex items-center justify-center">
+                🎯 Getränkeliste Dartverein 🎯
+            </h1>
+            <p class="text-lg text-gray-600 mt-2">Digitale Erfassung von Getränken und Schulden.</p>
+        </header>
+
+        <div class="mb-8">
+            <div id="tab-wrapper" class="flex justify-center border-b border-gray-300">
+                <button id="tab-dashboard" class="tab-button py-2 px-6 font-semibold rounded-t-lg tab-active">Übersicht</button>
+                <button id="tab-erfassen" class="tab-button py-2 px-6 font-semibold rounded-t-lg tab-inactive">Verbrauch erfassen</button>
+                <button id="tab-eintraege" class="tab-button py-2 px-6 font-semibold rounded-t-lg tab-inactive">Alle Einträge</button>
+                <button id="tab-settings" class="tab-button py-2 px-6 font-semibold rounded-t-lg tab-inactive hidden">Einstellungen</button>
+            </div>
+        </div>
+
+        <main>
+            <!-- Tab: Dashboard -->
+            <div id="content-dashboard" class="tab-content space-y-8">
+                <section id="dashboard-intro">
+                    <h2 class="text-2xl font-bold mb-4 text-center">Dashboard</h2>
+                    <p class="text-center max-w-3xl mx-auto text-gray-600">
+                        Willkommen zur Übersicht! Hier sehen Sie die wichtigsten Kennzahlen und Auswertungen auf einen Blick. Die Diagramme und Zahlen aktualisieren sich automatisch, sobald neue Verbrauchsdaten erfasst oder Zahlungen verbucht werden. So behalten Sie immer den vollen Überblick über die Finanzen und das Konsumverhalten im Verein.
+                    </p>
+                </section>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="card p-6 text-center">
+                        <h3 class="text-lg font-semibold text-gray-500">Gesamtschulden</h3>
+                        <p id="stats-total-debt" class="text-4xl font-bold mt-2">0,00 €</p>
+                    </div>
+                    <div class="card p-6 text-center">
+                        <h3 class="text-lg font-semibold text-gray-500">Offene Posten</h3>
+                        <p id="stats-open-entries" class="text-4xl font-bold mt-2">0</p>
+                    </div>
+                    <div class="card p-6 text-center">
+                        <h3 class="text-lg font-semibold text-gray-500">Bezahlte Einträge</h3>
+                        <p id="stats-paid-entries" class="text-4xl font-bold mt-2">0</p>
+                    </div>
+                    <div class="card p-6 text-center">
+                        <h3 class="text-lg font-semibold text-gray-500">PayPal Ziel</h3>
+                        <p class="text-md mt-2 font-mono bg-gray-100 p-2 rounded">dscdoppel1ev@gmail.com</p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="card p-6">
+                        <h3 class="text-xl font-bold text-center mb-4">Top 5 Spieler (nach Ausgaben)</h3>
+                        <div class="chart-container">
+                            <canvas id="player-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xl font-bold text-center mb-4">Beliebteste Getränke (nach Menge)</h3>
+                        <div class="chart-container">
+                            <canvas id="drink-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Verbrauch erfassen -->
+            <div id="content-erfassen" class="tab-content space-y-8" style="display: none;">
+                 <section id="erfassen-intro" class="mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-center">Neuen Verbrauch erfassen</h2>
+                    <p class="text-center max-w-3xl mx-auto text-gray-600">
+                        In diesem Bereich können Sie den Getränkeverbrauch für einen Spieler an einem bestimmten Tag eintragen. Wählen Sie einfach den Spieler und das Datum aus und geben Sie die Anzahl der konsumierten Getränke in die entsprechenden Felder ein. Die Gesamtsumme wird automatisch berechnet. Mit einem Klick auf "Eintrag hinzufügen" wird der Verbrauch gespeichert und erscheint in der Liste "Alle Einträge".
+                    </p>
+                </section>
+                <div class="card max-w-2xl mx-auto p-8">
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="form-player" class="block text-sm font-medium text-gray-700">Spieler</label>
+                                <select id="form-player" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"></select>
+                            </div>
+                            <div>
+                                <label for="form-date" class="block text-sm font-medium text-gray-700">Datum</label>
+                                <input type="date" id="form-date" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-2">Getränke</h4>
+                            <div id="form-drinks-container" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            </div>
+                        </div>
+                        <div class="text-right border-t pt-4">
+                            <span class="text-xl font-bold">Gesamt: <span id="form-total">0,00 €</span></span>
+                        </div>
+                        <button id="add-entry-btn" class="w-full btn-primary font-bold py-3 px-4 rounded-lg text-lg">Eintrag hinzufügen</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Alle Einträge -->
+            <div id="content-eintraege" class="tab-content space-y-8" style="display: none;">
+                <section id="eintraege-intro" class="mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-center">Alle erfassten Einträge</h2>
+                    <p class="text-center max-w-3xl mx-auto text-gray-600">
+                        Hier finden Sie eine vollständige Liste aller erfassten Getränkeverbräuche. Sie können die Liste nach Spieler oder Zahlungsstatus filtern, um schnell die gewünschten Informationen zu finden. Jeder Eintrag zeigt Details zum Verbrauch und den Gesamtkosten. Mit dem Schalter in der letzten Spalte können Sie einen Eintrag als "bezahlt" oder "offen" markieren. Fehlerhafte Einträge können über den "Stornieren" Button gelöscht werden.
+                    </p>
+                </section>
+                <div class="card p-4 md:p-6">
+                    <div class="flex flex-col md:flex-row gap-4 mb-4">
+                         <select id="filter-player" class="w-full md:w-auto p-2 border border-gray-300 rounded-md">
+                            <option value="all">Alle Spieler</option>
+                        </select>
+                        <select id="filter-status" class="w-full md:w-auto p-2 border border-gray-300 rounded-md">
+                            <option value="all">Alle Status</option>
+                            <option value="offen">Offen</option>
+                            <option value="bezahlt">Bezahlt</option>
+                            <option value="storniert">Storniert</option>
+                        </select>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Datum</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Spieler</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Gebühr</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Betrag (inkl. Gebühr)</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aktion</th>
+                                </tr>
+                            </thead>
+                            <tbody id="entries-table-body" class="bg-white divide-y divide-gray-200">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-8 pt-4 border-t border-gray-200">
+                        <h3 class="text-xl font-bold mb-4 text-center">Tagesübersicht exportieren</h3>
+                        <div class="flex flex-col md:flex-row gap-4 justify-center items-center">
+                            <label for="export-date" class="text-sm font-medium text-gray-700">Datum auswählen:</label>
+                            <input type="date" id="export-date" class="p-2 border border-gray-300 rounded-md shadow-sm">
+                            <button id="export-printable-btn" class="btn-primary px-4 py-2 rounded-md">Einträge als PDF</button>
+                            <button id="export-cancelled-btn" class="btn-primary px-4 py-2 rounded-md">Stornierte Einträge als PDF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Einstellungen -->
+            <div id="content-settings" class="tab-content space-y-8" style="display: none;">
+                 <section id="settings-intro" class="mb-8">
+                    <h2 class="text-2xl font-bold mb-4 text-center">Stammdaten verwalten</h2>
+                    <p class="text-center max-w-3xl mx-auto text-gray-600">
+                        Hier können Sie die Stammdaten der Anwendung pflegen. Fügen Sie neue Spieler hinzu oder entfernen Sie sie, und verwalten Sie die Liste der verfügbaren Getränke inklusive ihrer Preise. Änderungen hier werden sofort in der gesamten Anwendung wirksam, zum Beispiel im Formular zur Verbrauchserfassung.
+                    </p>
+                </section>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="card p-6">
+                        <h3 class="text-xl font-bold mb-4">Spieler verwalten</h3>
+                        <div class="flex flex-col sm:flex-row gap-2 mb-4">
+    <input type="text" id="new-player-name" placeholder="Neuer Spielername" class="flex-grow p-2 border border-gray-300 rounded-md">
+    <button id="add-player-btn" class="btn-primary px-4 py-2 rounded-md w-full sm:w-auto">Hinzufügen</button>
+</div>
+                        <ul id="player-list" class="space-y-2"></ul>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xl font-bold mb-4">Getränke verwalten</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                            <input type="text" id="new-drink-name" placeholder="Getränkename" class="p-2 border border-gray-300 rounded-md">
+                            <input type="number" id="new-drink-price" placeholder="Preis in €" step="0.01" class="p-2 border border-gray-300 rounded-md">
+                            <button id="add-drink-btn" class="btn-primary px-4 py-2 rounded-md">Hinzufügen</button>
+                        </div>
+                        <ul id="drink-list" class="space-y-2"></ul>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xl font-bold mb-4">Zettle Gebührenrate</h3>
+                        <div class="flex gap-2 mb-4 items-center">
+                            <label for="zettle-fee-percentage" class="text-sm font-medium text-gray-700">Aktuelle Gebühr (%):</label>
+                            <input type="number" id="zettle-fee-percentage" placeholder="z.B. 1.39" step="0.01" min="0" max="100" class="flex-grow p-2 border border-gray-300 rounded-md">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center mt-8">
+                    <button id="save-state-btn" class="btn-primary font-bold py-3 px-6 rounded-lg text-lg">Status speichern</button>
+                </div>
+                <div class="text-center mt-4">
+  <button id="reset-db-btn" class="btn-secondary font-bold py-3 px-6 rounded-lg text-lg bg-red-500 text-white hover:bg-red-600">
+    Datenbank zurücksetzen
+  </button>
+</div>
+
+<!-- Reset Options Modal -->
+<div id="reset-modal" class="reset-modal-overlay">
+  <div class="reset-modal-content">
+    <h2 class="mb-4 font-bold text-lg">Daten zurücksetzen</h2>
+    <p class="mb-4">Wählen Sie aus, welche Daten gelöscht werden sollen:</p>
+    <button class="reset-option-btn" data-type="entries">Verbrauchsdaten löschen</button>
+    <button class="reset-option-btn" data-type="drinks">Getränke löschen</button>
+    <button class="reset-option-btn" data-type="players">Spieler löschen</button>
+    <button class="reset-option-btn" data-type="all">Alle Daten löschen</button>
+    <button id="close-reset-modal" class="mt-4 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded">Abbrechen</button>
+  </div>
+</div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Fixed Footer for Admin and Logout buttons -->
+    <footer class="fixed-footer">
+        <div class="flex items-center space-x-4">
+            <button id="admin-login-btn-footer" class="btn-secondary px-4 py-2 rounded-md text-sm">Admin-Login</button>
+            <button id="logout-btn-footer" class="btn-secondary px-4 py-2 rounded-md text-sm">Abmelden</button>
+        </div>
+    </footer>
+
+    <script>
+        // Use DOMContentLoaded instead of window.onload for earlier execution
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = {
+                state: {
+                    players: [],
+                    drinks: [],
+                    entries: [],
+                    nextPlayerId: 1,
+                    nextDrinkId: 1,
+                    nextEntryId: 1,
+                    isAdmin: false,
+                    activeContentId: 'content-dashboard',
+                    zettleFeePercentage: 0.0139,
+                    isAuthReady: false, // New state variable to track Firebase authentication
+                },
+                firebase: {
+                    app: null,
+                    db: null,
+                    auth: null,
+                    userId: null,
+                    appId: 'dartverein-app-lokal'
+                },
+                charts: {
+                    playerChart: null,
+                    drinkChart: null,
+                },
+                CONSTANTS: {
+                    ADMIN_USERNAME: "Administrator",
+                    ADMIN_PASSWORD: "Doppel1",
+                },
+
+                init() {
+                    this.cacheDOM();
+                    this.bindEvents();
+                    // Ensure loading overlay is visible at the very start
+                    this.dom.loadingOverlay.style.display = 'flex';
+                    this.dom.loadingOverlay.style.opacity = '1';
+                    this.dom.loadingOverlay.style.visibility = 'visible';
+                    console.log("App init: Loading overlay set to visible.");
+                    
+                    // Initial render with empty data, overlay is still up
+                    this.render(); 
+                    
+                    // Call the main initialization function
+                    this.initializeFirebase();
+                },
+
+                cacheDOM() {
+                    this.dom = {
+                        loadingOverlay: document.getElementById('loading-overlay'),
+                        saveMessage: document.getElementById('save-message'),
+                        
+                        appContainer: document.getElementById('app-container'),
+                        adminLoginBtn: document.getElementById('admin-login-btn-footer'), 
+                        logoutBtn: document.getElementById('logout-btn-footer'),
+
+                        tabs: document.querySelectorAll('.tab-button'),
+                        tabDashboard: document.getElementById('tab-dashboard'),
+                        tabErfassen: document.getElementById('tab-erfassen'),
+                        tabEintraege: document.getElementById('tab-eintraege'),
+                        tabSettings: document.getElementById('tab-settings'),
+                        
+                        contentDashboard: document.getElementById('content-dashboard'),
+                        contentErfassen: document.getElementById('content-erfassen'),
+                        contentEintraege: document.getElementById('content-eintraege'),
+                        contentSettings: document.getElementById('content-settings'),
+                        
+                        formPlayer: document.getElementById('form-player'),
+                        formDate: document.getElementById('form-date'),
+                        formDrinksContainer: document.getElementById('form-drinks-container'),
+                        formTotal: document.getElementById('form-total'),
+                        addEntryBtn: document.getElementById('add-entry-btn'),
+
+                        entriesTableBody: document.getElementById('entries-table-body'),
+                        filterPlayer: document.getElementById('filter-player'),
+                        filterStatus: document.getElementById('filter-status'),
+                        exportDate: document.getElementById('export-date'),
+                        exportPrintableBtn: document.getElementById('export-printable-btn'),
+                        exportCancelledBtn: document.getElementById('export-cancelled-btn'),
+
+                        newPlayerName: document.getElementById('new-player-name'),
+                        addPlayerBtn: document.getElementById('add-player-btn'),
+                        playerList: document.getElementById('player-list'),
+
+                        newDrinkName: document.getElementById('new-drink-name'),
+                        newDrinkPrice: document.getElementById('new-drink-price'),
+                        addDrinkBtn: document.getElementById('add-drink-btn'),
+                        drinkList: document.getElementById('drink-list'),
+                        zettleFeeInput: document.getElementById('zettle-fee-percentage'),
+
+                        statsTotalDebt: document.getElementById('stats-total-debt'),
+                        statsOpenEntries: document.getElementById('stats-open-entries'),
+                        statsPaidEntries: document.getElementById('stats-paid-entries'),
+                        playerChartCanvas: document.getElementById('player-chart'),
+                        drinkChartCanvas: document.getElementById('drink-chart'),
+
+                        saveStateBtn: document.getElementById('save-state-btn'),
+                        resetDbBtn: document.getElementById('reset-db-btn'),
+
+
+                        // Admin Modal elements
+                        adminLoginModal: document.getElementById('admin-login-modal'),
+                        adminPasswordInput: document.getElementById('admin-password-input'),
+                        adminModalLoginBtn: document.getElementById('admin-modal-login-btn'),
+                        adminModalCancelBtn: document.getElementById('admin-modal-cancel-btn'),
+                    };
+                    this.dom.tabContents = document.querySelectorAll('.tab-content');
+                },
+
+                bindEvents() {
+                    this.dom.exportCancelledBtn = document.getElementById('export-cancelled-btn');
+                    this.dom.exportCancelledBtn.addEventListener('click', () => this.generateCancelledEntriesPDF());
+                    this.dom.adminLoginBtn.addEventListener('click', () => this.showAdminLoginModal());
+                    this.dom.logoutBtn.addEventListener('click', () => this.handleLogout());
+                    this.dom.tabs.forEach(tab => {
+                        tab.addEventListener('click', (e) => this.handleTabClick(e));
+                    });
+                    this.dom.addEntryBtn.addEventListener('click', () => this.addEntry());
+                    this.dom.addPlayerBtn.addEventListener('click', () => this.addPlayer());
+                    this.dom.addDrinkBtn.addEventListener('click', () => this.addDrink());
+
+                    this.dom.formDrinksContainer.addEventListener('input', () => this.updateFormTotal());
+                    
+                    this.dom.filterPlayer.addEventListener('change', () => this.renderEntriesTable());
+                    this.dom.filterStatus.addEventListener('change', () => this.renderEntriesTable());
+                    this.dom.exportPrintableBtn.addEventListener('click', () => this.generatePrintableSummary());
+
+                    this.dom.playerList.addEventListener('click', (e) => {
+                        if (e.target.dataset.action === 'delete-player') {
+                            this.deletePlayer(parseInt(e.target.dataset.id));
+                        } else if (e.target.dataset.action === 'edit-player') {
+                            this.editPlayerName(parseInt(e.target.dataset.id));
+                        }
+                    });
+
+                    this.dom.drinkList.addEventListener('click', (e) => {
+                        if (e.target.dataset.action === 'delete-drink') {
+                            this.deleteDrink(parseInt(e.target.dataset.id));
+                        } else if (e.target.dataset.action === 'edit-drink') {
+                            this.editDrinkPrice(parseInt(e.target.dataset.id));
+                        }
+                    });
+                    
+                    this.dom.entriesTableBody.addEventListener('click', (e) => {
+                         if (e.target.dataset.action === 'toggle-paid') {
+                            this.togglePaidStatus(parseInt(e.target.dataset.id));
+                        } else if (e.target.dataset.action === 'delete-entry') {
+                            this.deleteEntry(parseInt(e.target.dataset.id));
+                        }
+                    });
+
+                    this.dom.saveStateBtn.addEventListener('click', () => this.saveState());
+                    this.dom.resetDbBtn.addEventListener('click', () => this.resetDatabase());
+                    this.dom.zettleFeeInput.addEventListener('input', () => this.updateZettleFee());
+
+                    // Admin Modal Events
+                    this.dom.adminModalLoginBtn.addEventListener('click', () => this.handleAdminLoginAttempt());
+                    this.dom.adminModalCancelBtn.addEventListener('click', () => this.hideAdminLoginModal());
+                    this.dom.adminPasswordInput.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            this.handleAdminLoginAttempt();
+                        }
+                    });
+                },
+
+                // Helper function to hide the loading overlay with a slight delay
+                hideLoadingOverlay() {
+                    console.log("hideLoadingOverlay: Start fading out loading overlay.");
+                    this.dom.loadingOverlay.classList.add('hidden-fade');
+                    setTimeout(() => {
+                        this.dom.loadingOverlay.style.display = 'none';
+                        console.log("hideLoadingOverlay: Loading overlay hidden (display: none).");
+                    }, 300); // Matches CSS transition duration
+                },
+
+                // Admin Modal Functions
+                showAdminLoginModal() {
+                    this.dom.adminLoginModal.classList.add('show-modal');
+                    this.dom.adminPasswordInput.value = ''; // Clear input on show
+                    this.dom.adminPasswordInput.focus(); // Focus input for immediate typing
+                },
+
+                hideAdminLoginModal() {
+                    this.dom.adminLoginModal.classList.remove('show-modal');
+                },
+
+                handleAdminLoginAttempt() {
+                    const password = this.dom.adminPasswordInput.value;
+                    if (password === this.CONSTANTS.ADMIN_PASSWORD) {
+                        this.state.isAdmin = true;
+                        sessionStorage.setItem('isAdmin', 'true');
+                        alert("Erfolgreich als Administrator angemeldet!");
+                        this.hideAdminLoginModal();
+                        this.render(); // UI aktualisieren, um Einstellungen anzuzeigen
+                    } else {
+                        alert("Falsches Passwort.");
+                        this.dom.adminPasswordInput.value = ''; // Clear password on wrong attempt
+                    }
+                },
+
+async initializeFirebase() {
+  console.log("initializeFirebase: Starting Firebase initialization.");
+
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("Firebase-Initialisierung hat zu lange gedauert.")), 15000);
+  });
+
+  try {
+    const initPromise = new Promise(async (resolve, reject) => {
+      if (!window.firebase || !window.firebase.getAuth) {
+        return reject(new Error("Firebase SDK nicht verfügbar."));
+      }
+
+      this.firebase.app = window.firebase.app;
+      this.firebase.db = window.firebase.getFirestore(this.firebase.app);
+      this.firebase.auth = window.firebase.getAuth(this.firebase.app);
+
+      try {
+        await window.firebase.signInAnonymously(this.firebase.auth);
+        this.firebase.userId = this.firebase.auth.currentUser?.uid;
+        this.state.isAuthReady = true;
+
+        console.log("Anonymous login success:", this.firebase.userId);
+
+        await this.loadState();
+        await this.ensureAdminPlayerExists();
+
+        this.state.isAdmin = sessionStorage.getItem('isAdmin') === 'true';
+        this.render();
+
+        resolve();
+      } catch (authError) {
+        console.error("Auth error:", authError);
+        alert("Fehler bei der Anmeldung: " + authError.message);
+        this.render();
+        reject(authError);
+      }
+    });
+
+    await Promise.race([initPromise, timeoutPromise]);
+
+  } catch (err) {
+    alert("Ein unerwarteter Fehler ist bei der Initialisierung aufgetreten: " + err.message);
+    this.state.isAuthReady = false;
+    this.render();
+  } finally {
+    this.hideLoadingOverlay();
+  }
+},
+
+
+                async ensureAdminPlayerExists() {
+                    if (!this.state.isAuthReady) {
+                        console.warn("Firebase Auth ist nicht bereit für ensureAdminPlayerExists.");
+                        return;
+                    }
+
+                    if (!this.state.players.some(p => p.name === this.CONSTANTS.ADMIN_USERNAME)) {
+                        const newPlayerId = this.state.nextPlayerId++;
+                        this.state.players.push({ id: newPlayerId, name: this.CONSTANTS.ADMIN_USERNAME });
+                        console.log("Administrator-Spieler wurde hinzugefügt. Speichere Status...");
+                        await this.saveState();
+                    }
+                },
+
+                handleLogout() {
+                    this.state.isAdmin = false;
+                    this.state.activeContentId = 'content-dashboard';
+                    sessionStorage.removeItem('isAdmin');
+                    alert("Erfolgreich abgemeldet!");
+                    this.render();
+                },
+
+                updateUIVisibilityBasedOnRole() {
+                    console.log("updateUIVisibilityBasedOnRole: is Admin?", this.state.isAdmin);
+                    if (this.state.isAdmin) {
+                        this.dom.tabSettings.classList.remove('hidden');
+                    } else {
+                        this.dom.tabSettings.classList.add('hidden');
+                        if (this.state.activeContentId === 'content-settings') {
+                            this.state.activeContentId = 'content-dashboard';
+                            this.handleTabStyling(this.dom.tabDashboard);
+                        }
+                    }
+                },
+
+                async loadState() {
+                    console.log("loadState: Attempting to load state from Firestore.");
+                    if (!this.state.isAuthReady) {
+                        console.warn("Firebase Auth ist nicht bereit für den Ladevorgang (loadState).");
+                        return;
+                    }
+                    try {
+                        const docPath = `artifacts/${this.firebase.appId}/public/data/dartClubSharedData/current`;
+                        const docRef = window.firebase.doc(this.firebase.db, docPath);
+                        const docSnap = await window.firebase.getDoc(docRef);
+
+                        if (docSnap.exists()) {
+                            const loadedState = docSnap.data();
+                            console.log("loadState: Geladene Daten:", loadedState);
+                            // Ensure robust assignment for arrays, even if they are missing in Firestore
+                            this.state.players = Array.isArray(loadedState.players) ? loadedState.players : [];
+                            this.state.drinks = Array.isArray(loadedState.drinks) ? loadedState.drinks : [];
+                            this.state.entries = Array.isArray(loadedState.entries) ? loadedState.entries : [];
+                            this.state.nextPlayerId = loadedState.nextPlayerId || 1;
+                            this.state.nextDrinkId = loadedState.nextDrinkId || 1;
+                            this.state.nextEntryId = loadedState.nextEntryId || 1;
+                            this.state.zettleFeePercentage = loadedState.zettleFeePercentage !== undefined ? loadedState.zettleFeePercentage : 0.0139;
+                            console.log("Status erfolgreich aus dem gemeinsamen Speicher geladen. Aktueller State:", this.state);
+                        } else {
+                            console.log("Kein gespeicherter Status im gemeinsamen Speicher gefunden, initialisiere mit leeren Daten und Admin.");
+                            this.state.players = [];
+                            this.state.drinks = [];
+                            this.state.entries = [];
+                            this.state.nextPlayerId = 1;
+                            this.state.nextDrinkId = 1;
+                            this.state.nextEntryId = 1;
+                            this.state.zettleFeePercentage = 0.0139;
+
+                            if (!this.state.players.some(p => p.name === this.CONSTANTS.ADMIN_USERNAME)) {
+                                this.state.players.push({ id: this.state.nextPlayerId++, name: this.CONSTANTS.ADMIN_USERNAME });
+                            }
+                            await this.saveState();
+                        }
+                    } catch (error) {
+                        console.error("Fehler beim Laden des Status aus dem gemeinsamen Speicher:", error);
+                        alert(`Fehler beim Laden der Daten: ${error.message}. Dies deutet oft auf Probleme mit den Firebase-Sicherheitsregeln oder der Datenbankverbindung hin.`);
+                        this.state.players = [];
+                        this.state.drinks = [];
+                        this.state.entries = [];
+                        this.state.zettleFeePercentage = 0.0139;
+                    }
+                },
+
+async saveState() {
+  if (!this.state.isAuthReady) {
+    console.error("Firebase Auth ist nicht bereit. Status kann nicht gespeichert werden.");
+    alert("Fehler: Speichern nicht möglich. Firebase ist nicht initialisiert oder die Authentifizierung fehlgeschlagen.");
+    return;
+  }
+
+  try {
+    const docPath = `artifacts/${this.firebase.appId}/public/data/dartClubSharedData/current`;
+    const docRef = window.firebase.doc(this.firebase.db, docPath);
+    await window.firebase.setDoc(docRef, this.state);
+    console.log("Status erfolgreich im gemeinsamen Speicher gespeichert!");
+    this.showSaveMessage();
+  } catch (error) {
+    console.error("Fehler beim Speichern des Status im gemeinsamen Speicher:", error);
+    alert("Fehler beim Speichern des Status: " + error.message);
+  }
+},
+
+async resetDatabase() {
+     // Show popup when reset button is clicked
+    this.dom.resetDbBtn.addEventListener("click", () => {
+        document.getElementById("reset-modal").style.display = "flex";
+    });
+
+    // Close popup
+    document.getElementById("close-reset-modal").addEventListener("click", () => {
+        document.getElementById("reset-modal").style.display = "none";
+    });
+
+    // Handle reset choice (attach once only)
+    document.querySelectorAll(".reset-option-btn").forEach(btn => {
+        btn.onclick = async () => {
+            const type = btn.dataset.type;
+
+            if (!this.state.isAdmin) {
+                alert("Nur Administratoren dürfen die Datenbank zurücksetzen.");
+                return;
+            }
+
+            if (!this.state.isAuthReady || !this.firebase.db) {
+                alert("Firebase ist nicht bereit. Bitte laden Sie die Seite neu.");
+                return;
+            }
+
+            const confirmed = confirm("⚠️ Sind Sie sicher? Dies kann nicht rückgängig gemacht werden!");
+            if (!confirmed) return;
+
+            try {
+                const docPath = `artifacts/${this.firebase.appId}/public/data/dartClubSharedData/current`;
+                const docRef = window.firebase.doc(this.firebase.db, docPath);
+
+                let newState = { ...this.state };
+
+                if (type === "entries") newState.entries = [];
+                if (type === "drinks") newState.drinks = [];
+                if (type === "players") newState.players = [];
+                if (type === "all") {
+                    newState = {
+                        players: [],
+                        drinks: [],
+                        entries: [],
+                        nextPlayerId: 1,
+                        nextDrinkId: 1,
+                        nextEntryId: 1,
+                        zettleFeePercentage: 0.0139,
+                        isAdmin: false,
+                        isAuthReady: true,
+                        activeContentId: 'content-dashboard'
+                    };
+                }
+
+                await window.firebase.setDoc(docRef, newState);
+                alert("✅ Datenbank erfolgreich zurückgesetzt!");
+                this.state = { ...this.state, ...newState };
+                this.render();
+
+            } catch (error) {
+                console.error("Fehler beim Zurücksetzen:", error);
+                alert("❌ Fehler: " + error.message);
+            }
+
+            document.getElementById("reset-modal").style.display = "none";
+        };
+    });
+},
+
+                showSaveMessage() {
+                    this.dom.saveMessage.classList.add('show');
+                    setTimeout(() => {
+                        this.dom.saveMessage.classList.remove('show');
+                    }, 2000);
+                },
+
+                render() {
+                    console.log("render: Start rendering UI with current state:", this.state);
+                    this.renderSettings();
+                    this.renderForm();
+                    this.renderEntriesTable();
+                    this.renderDashboard();
+                    this.updateUIVisibilityBasedOnRole();
+                    this.renderTabContentVisibility();
+                    console.log("render: UI rendered successfully.");
+                },
+
+                renderTabContentVisibility() {
+                    console.log("renderTabContentVisibility: Active tab content ID:", this.state.activeContentId);
+                    this.dom.tabContents.forEach(content => {
+                        if (content.id === this.state.activeContentId) {
+                            content.style.display = 'block';
+                        } else {
+                            content.style.display = 'none';
+                        }
+                    });
+                    this.dom.tabs.forEach(tab => {
+                        if (tab.id.replace('tab-', 'content-') === this.state.activeContentId) {
+                            tab.classList.replace('tab-inactive', 'tab-active');
+                        } else {
+                            tab.classList.replace('tab-active', 'tab-inactive');
+                        }
+                    });
+                },
+
+                handleTabStyling(targetTabElement) {
+                    this.dom.tabs.forEach(tab => {
+                        tab.classList.replace('tab-active', 'tab-inactive');
+                    });
+                    targetTabElement.classList.replace('tab-inactive', 'tab-active');
+                },
+
+                calculateFinalPriceWithFee(originalPrice) {
+                    if (this.state.zettleFeePercentage >= 1) {
+                         console.error("Zettle fee percentage is 100% or more, cannot calculate final price. Returning original price.");
+                         return originalPrice;
+                    }
+                    if (this.state.zettleFeePercentage < 0) {
+                         console.warn("Zettle fee percentage is negative. Returning original price.");
+                         return originalPrice;
+                    }
+                    const finalPrice = originalPrice / (1 - this.state.zettleFeePercentage);
+                    return Math.ceil(finalPrice * 100) / 100;
+                },
+
+               renderDashboard() {
+    console.log("renderDashboard: Starting to render dashboard.");
+    let totalDebt = 0;
+    let openEntries = 0;
+    let paidEntries = 0;
+    const playerSpending = {};
+    const drinkCounts = {};
+
+    if (Array.isArray(this.state.players)) {
+        this.state.players.forEach(p => playerSpending[p.name] = 0);
+    }
+    if (Array.isArray(this.state.drinks)) {
+        this.state.drinks.forEach(d => drinkCounts[d.name] = 0);
+    }
+
+    if (Array.isArray(this.state.entries)) {
+        this.state.entries.forEach(entry => {
+            // ✅ Skip cancelled entries completely
+            if (entry.cancelled) return;
+
+            const originalEntryTotal = this.calculateEntryTotal(entry);
+            const finalEntryTotal = this.calculateFinalPriceWithFee(originalEntryTotal);
+            const playerName = this.state.players.find(p => p.id === entry.playerId)?.name || 'Unbekannt';
+            
+            if (!entry.paid) {
+                totalDebt += finalEntryTotal;
+                openEntries++;
+                playerSpending[playerName] = (playerSpending[playerName] || 0) + finalEntryTotal;
+            } else {
+                paidEntries++;
+            }
+
+            entry.items.forEach(item => {
+                const drink = this.state.drinks.find(d => d.id === item.drinkId);
+                const drinkName = drink ? drink.name : 'Unbekannt';
+                drinkCounts[drinkName] = (drinkCounts[drinkName] || 0) + item.quantity;
+            });
+        });
+    }
+
+    console.log("renderDashboard: Prepared player spending data:", playerSpending);
+    console.log("renderDashboard: Prepared drink counts data:", drinkCounts);
+
+    this.dom.statsTotalDebt.textContent = `${totalDebt.toFixed(2)} €`;
+    this.dom.statsOpenEntries.textContent = openEntries;
+    this.dom.statsPaidEntries.textContent = paidEntries;
+    
+    this.renderPlayerChart(playerSpending);
+    this.renderDrinkChart(drinkCounts);
+    console.log("renderDashboard: Dashboard rendering complete.");
+},
+
+                renderPlayerChart(playerSpending) {
+                    console.log("renderPlayerChart: Rendering player chart with data:", playerSpending);
+                    const sortedPlayers = Object.entries(playerSpending)
+                        .filter(([, total]) => total > 0)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5);
+
+                    const labels = sortedPlayers.map(([name]) => name);
+                    const data = sortedPlayers.map(([, total]) => total);
+
+                    if (this.charts.playerChart) {
+                        this.charts.playerChart.destroy();
+                    }
+                    this.charts.playerChart = new Chart(this.dom.playerChartCanvas, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Ausgaben in €',
+                                data: data,
+                                backgroundColor: '#6B7280',
+                                borderColor: '#4B5563',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return value + '€';
+                                        }
+                                    }
+                                }
+                            },
+                             plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            }
+                        }
+                    });
+                    console.log("renderPlayerChart: Player chart rendered.");
+                },
+
+                renderDrinkChart(drinkCounts) {
+                    console.log("renderDrinkChart: Rendering drink chart with data:", drinkCounts);
+                    const sortedDrinks = Object.entries(drinkCounts)
+                        .filter(([, total]) => total > 0)
+                        .sort(([, a], [, b]) => b - a)
+                        .slice(0, 5);
+
+                    const labels = sortedDrinks.map(([name]) => name);
+                    const data = sortedDrinks.map(([, total]) => total);
+                    
+                    if (this.charts.drinkChart) {
+                        this.charts.drinkChart.destroy();
+                    }
+                    this.charts.drinkChart = new Chart(this.dom.drinkChartCanvas, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Menge',
+                                data: data,
+                                backgroundColor: ['#4A5568', '#718096', '#A0AEC0', '#CBD5E0', '#E2E8F0'],
+                                hoverOffset: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                        }
+                    });
+                    console.log("renderDrinkChart: Drink chart rendered.");
+                },
+
+                renderSettings() {
+                    console.log("renderSettings: Starting to render settings. Is Admin?", this.state.isAdmin);
+                    if (!this.state.isAdmin) {
+                        this.dom.playerList.innerHTML = '';
+                        this.dom.drinkList.innerHTML = '';
+                        this.dom.zettleFeeInput.value = '';
+                        return;
+                    }
+
+                    console.log("renderSettings: Rendering player list with data:", this.state.players);
+                    this.dom.playerList.innerHTML = this.state.players.map(player => `
+                        <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                            <span>${player.name}</span>
+                            <div class="space-x-2">
+                                ${player.name !== this.CONSTANTS.ADMIN_USERNAME ? `<button data-id="${player.id}" data-action="edit-player" class="text-blue-500 hover:text-blue-700">Bearbeiten</button>` : ''}
+                                ${player.name !== this.CONSTANTS.ADMIN_USERNAME ? `<button data-id="${player.id}" data-action="delete-player" class="text-red-500 hover:text-red-700">Löschen</button>` : ''}
+                            </div>
+                        </li>
+                    `).join('');
+
+                    console.log("renderSettings: Rendering drink list with data:", this.state.drinks);
+                    this.dom.drinkList.innerHTML = this.state.drinks.map(drink => `
+                        <li class="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                            <span>${drink.name} (${drink.price.toFixed(2)} €)</span>
+                            <div class="space-x-2">
+                                <button data-id="${drink.id}" data-action="edit-drink" class="text-blue-500 hover:text-blue-700">Bearbeiten</button>
+                                <button data-id="${drink.id}" data-action="delete-drink" class="text-red-500 hover:text-red-700">Löschen</button>
+                            </div>
+                        </li>
+                    `).join('');
+                    this.dom.zettleFeeInput.value = (this.state.zettleFeePercentage * 100).toFixed(2);
+                    console.log("renderSettings: Settings rendering complete.");
+                },
+
+                async updateZettleFee() {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können die Gebührenrate ändern.");
+                        this.dom.zettleFeeInput.value = (this.state.zettleFeePercentage * 100).toFixed(2);
+                        return;
+                    }
+                    const newFee = parseFloat(this.dom.zettleFeeInput.value);
+                    if (!isNaN(newFee) && newFee >= 0 && newFee < 100) {
+                        this.state.zettleFeePercentage = newFee / 100;
+                        this.render();
+                        await this.saveState();
+                    } else {
+                        alert("Bitte geben Sie einen gültigen Prozentsatz (0-99.99) ein.");
+                        this.dom.zettleFeeInput.value = (this.state.zettleFeePercentage * 100).toFixed(2);
+                    }
+                },
+
+                renderForm() {
+                    console.log("renderForm: Starting to render form.");
+                    console.log("renderForm: Players to render:", this.state.players);
+                    console.log("renderForm: Drinks to render:", this.state.drinks);
+                    const playersForForm = this.state.players.filter(p => p.name !== this.CONSTANTS.ADMIN_USERNAME);
+                    this.dom.formPlayer.innerHTML = playersForForm.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                    this.dom.filterPlayer.innerHTML = '<option value="all">Alle Spieler</option>' + this.state.players.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                    
+                    this.dom.formDrinksContainer.innerHTML = this.state.drinks.map(drink => `
+                        <div>
+                            <label for="drink-${drink.id}" class="block text-sm font-medium text-gray-700">${drink.name}</label>
+                            <input type="number" id="drink-${drink.id}" data-drink-id="${drink.id}" min="0" value="0" class="drink-input mt-1 block w-full p-2 border border-gray-300 rounded-md">
+                        </div>
+                    `).join('');
+
+                    this.dom.formDate.valueAsDate = new Date();
+                    this.updateFormTotal();
+                    console.log("renderForm: Form rendering complete.");
+                },
+
+                renderEntriesTable() {
+                    console.log("renderEntriesTable: Starting to render entries table.");
+                    console.log("renderEntriesTable: All entries:", this.state.entries);
+                    const filteredEntries = this.state.entries.filter(entry => {
+    const playerMatch =
+        this.dom.filterPlayer.value === 'all' || entry.playerId == this.dom.filterPlayer.value;
+
+    const statusValue = this.dom.filterStatus.value;
+    const statusMatch =
+        statusValue === 'all' ||
+        (statusValue === 'bezahlt' && entry.paid && !entry.cancelled) ||
+        (statusValue === 'offen' && !entry.paid && !entry.cancelled) ||
+        (statusValue === 'storniert' && entry.cancelled);
+
+    return playerMatch && statusMatch;
+});
+
+                 console.log("renderEntriesTable: Filtered entries:", filteredEntries);
+
+                    this.dom.entriesTableBody.innerHTML = filteredEntries.map(entry => {
+                        const player = this.state.players.find(p => p.id === entry.playerId);
+                        const originalTotal = this.calculateEntryTotal(entry);
+                        const finalTotal = this.calculateFinalPriceWithFee(originalTotal);
+                        const feeAmount = finalTotal - originalTotal;
+
+                        const details = entry.items.map(item => {
+                            const drink = this.state.drinks.find(d => d.id === item.drinkId);
+                            return `${item.quantity}x ${drink ? drink.name : 'Unbekannt'}`;
+                        }).join(', ');
+
+                        return `
+<tr class="${entry.cancelled ? 'line-through text-gray-400 opacity-60' : (entry.paid ? 'bg-green-50' : 'bg-red-50')}">
+                                <td class="px-6 py-4 whitespace-nowrap">${new Date(entry.date).toLocaleDateString('de-DE')}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">${player ? player.name : 'Unbekannt'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${details}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-medium">${feeAmount.toFixed(2)} €</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-right font-medium">${finalTotal.toFixed(2)} €</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-center">
+    ${entry.cancelled ? '-' : `
+        <button data-id="${entry.id}" data-action="toggle-paid" class="px-3 py-1 text-sm font-semibold rounded-full ${entry.paid ? 'btn-success' : 'btn-danger'}">
+            ${entry.paid ? 'Bezahlt' : 'Offen'}
+        </button>
+    `}
+</td>
+<td class="px-6 py-4 whitespace-nowrap text-center">
+    ${entry.cancelled ? '<span class="text-xs text-gray-400">Storniert</span>' : `
+        <button data-id="${entry.id}" data-action="delete-entry" class="btn-warn px-3 py-1 text-sm font-semibold rounded-full">
+            Stornieren
+        </button>
+    `}
+</td>
+
+                            </tr>
+                        `;
+                    }).join('');
+                    console.log("renderEntriesTable: Entries table rendering complete.");
+                },
+
+                updateFormTotal() {
+                    let total = 0;
+                    const drinkInputs = this.dom.formDrinksContainer.querySelectorAll('.drink-input');
+                    drinkInputs.forEach(input => {
+                        const quantity = parseInt(input.value) || 0;
+                        if (quantity > 0) {
+                            const drinkId = parseInt(input.dataset.drinkId);
+                            const drink = this.state.drinks.find(d => d.id === drinkId);
+                            if (drink) {
+                                total += quantity * drink.price;
+                            }
+                        }
+                    });
+                    this.dom.formTotal.textContent = `${total.toFixed(2)} €`;
+                },
+                
+                async addEntry() {
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const playerId = parseInt(this.dom.formPlayer.value);
+                    const date = this.dom.formDate.value;
+                    const items = [];
+
+                    const drinkInputs = this.dom.formDrinksContainer.querySelectorAll('.drink-input');
+                    drinkInputs.forEach(input => {
+                        const quantity = parseInt(input.value) || 0;
+                        if (quantity > 0) {
+                            items.push({
+                                drinkId: parseInt(input.dataset.drinkId),
+                                quantity: quantity
+                            });
+                        }
+                    });
+
+                    if (!playerId || !date || items.length === 0) {
+                        alert('Bitte Spieler, Datum und mindestens ein Getränk auswählen.');
+                        return;
+                    }
+
+                    const newEntry = {
+                        id: this.state.nextEntryId++,
+                        playerId,
+                        date,
+                        paid: false,
+                        items,
+                        cancelled: false,
+                    };
+
+                    this.state.entries.push(newEntry);
+                    this.render();
+                    await this.saveState();
+                    this.handleTabClick({ currentTarget: this.dom.tabEintraege });
+                },
+
+                async addPlayer() {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können Spieler hinzufügen.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const name = this.dom.newPlayerName.value.trim();
+                    if (name && !this.state.players.some(p => p.name === name)) {
+                        this.state.players.push({ id: this.state.nextPlayerId++, name });
+                        this.dom.newPlayerName.value = '';
+                        this.render();
+                        await this.saveState();
+                    } else if (this.state.players.some(p => p.name === name)) {
+                        alert("Ein Spieler mit diesem Namen existiert bereits.");
+                    }
+                },
+
+                async deletePlayer(id) {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können Spieler löschen.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const playerToDelete = this.state.players.find(p => p.id === id);
+                    if (playerToDelete && playerToDelete.name === this.CONSTANTS.ADMIN_USERNAME) {
+                        alert("Der Administrator-Spieler kann nicht gelöscht werden.");
+                        return;
+                    }
+
+                    if (confirm('Soll dieser Spieler wirklich gelöscht werden? Alle zugehörigen Einträge bleiben erhalten, werden aber als "Unbekannt" angezeigt.')) {
+                        this.state.players = this.state.players.filter(p => p.id !== id);
+                        this.render();
+                        await this.saveState();
+                    }
+                },
+
+                async editPlayerName(id) {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können Spielernamen ändern.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const playerToEdit = this.state.players.find(p => p.id === id);
+                    if (!playerToEdit) return;
+
+                    if (playerToEdit.name === this.CONSTANTS.ADMIN_USERNAME) {
+                        alert("Der Name des Administrator-Spielers kann nicht geändert werden.");
+                        return;
+                    }
+
+                    const newName = prompt(`Neuen Namen für "${playerToEdit.name}" eingeben:`, playerToEdit.name);
+                    if (newName && newName.trim() !== '' && newName.trim() !== playerToEdit.name) {
+                        if (this.state.players.some(p => p.name === newName.trim())) {
+                            alert("Ein Spieler mit diesem Namen existiert bereits.");
+                            return;
+                        }
+                        playerToEdit.name = newName.trim();
+                        this.render();
+                        await this.saveState();
+                    }
+                },
+
+                async addDrink() {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können Getränke hinzufügen.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const name = this.dom.newDrinkName.value.trim();
+                    const price = parseFloat(this.dom.newDrinkPrice.value);
+                    if (name && !isNaN(price) && price > 0) {
+                        this.state.drinks.push({ id: this.state.nextDrinkId++, name, price });
+                        this.dom.newDrinkName.value = '';
+                        this.dom.newDrinkPrice.value = '';
+                        this.render();
+                        await this.saveState();
+                    } else {
+                        alert("Bitte gültigen Getränkenamen und Preis eingeben.");
+                    }
+                },
+
+                async deleteDrink(id) {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können Getränke löschen.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    if (confirm('Soll dieses Getränk wirklich gelöscht werden? Alle zugehörigen Einträge bleiben erhalten, werden aber als "Unbekannt" angezeigt.')) {
+                        this.state.drinks = this.state.drinks.filter(d => d.id !== id);
+                        this.render();
+                        await this.saveState();
+                    }
+                },
+
+                async editDrinkPrice(id) {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können Getränkepreise ändern.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const drinkToEdit = this.state.drinks.find(d => d.id === id);
+                    if (!drinkToEdit) return;
+
+                    const newPriceStr = prompt(`Neuen Preis für "${drinkToEdit.name}" eingeben:`, drinkToEdit.price.toFixed(2));
+                    if (newPriceStr !== null && newPriceStr.trim() !== '') {
+                        const newPrice = parseFloat(newPriceStr.replace(',', '.')); // Erlaubt Komma als Dezimaltrennzeichen
+                        if (!isNaN(newPrice) && newPrice >= 0) {
+                            drinkToEdit.price = newPrice;
+                            this.render();
+                            await this.saveState();
+                        } else {
+                            alert("Ungültiger Preis. Bitte geben Sie eine Zahl ein.");
+                        }
+                    }
+                },
+
+                async togglePaidStatus(id) {
+                    if (!this.state.isAdmin) {
+                        alert("Nur Administratoren können den Bezahlstatus ändern.");
+                        return;
+                    }
+                    if (!this.state.isAuthReady) {
+                        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+                        return;
+                    }
+                    const entry = this.state.entries.find(e => e.id === id);
+                    if (entry) {
+                        entry.paid = !entry.paid;
+                        this.render();
+                        await this.saveState();
+                    }
+                },
+
+async deleteEntry(id) {
+    if (!this.state.isAuthReady) {
+        alert("App lädt noch. Bitte warten Sie, bis der Ladevorgang abgeschlossen ist.");
+        return;
+    }
+
+    if (confirm('Soll dieser Eintrag wirklich storniert werden?')) {
+        const entry = this.state.entries.find(e => e.id === id);
+        if (entry) {
+            entry.cancelled = true;
+        }
+        this.render();
+        await this.saveState();
+    }
+},
+                
+                calculateEntryTotal(entry) {
+    if (entry.cancelled) return 0; // ❌ Ignore cancelled entries
+    return entry.items.reduce((sum, item) => {
+        const drink = this.state.drinks.find(d => d.id === item.drinkId);
+        return sum + (drink ? drink.price * item.quantity : 0);
+    }, 0);
+},
+
+async generatePrintableSummary() {
+    const selectedDate = this.dom.exportDate.value;
+    if (!selectedDate) {
+        alert("Bitte wählen Sie ein Datum für die Abrechnung aus.");
+        return;
+    }
+
+    const entries = this.state.entries.filter(entry =>
+        entry.date === selectedDate && !entry.cancelled
+    );
+
+    if (entries.length === 0) {
+        alert("Keine gültigen Einträge für dieses Datum.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let y = 20;
+    let rawTotal = 0;
+    let feeTotal = 0;
+    let grandTotal = 0;
+    const zettlePercent = this.state.zettleFeePercent || 0; // Default to 0 if not set
+
+    doc.setFont("helvetica");
+    doc.setFontSize(14);
+    doc.text(`Getränkeabrechnung - ${new Date(selectedDate).toLocaleDateString('de-DE')}`, 14, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text("Spieler", 14, y);
+    doc.text("Details", 60, y);
+    doc.text("Status", 150, y);
+    doc.text("Gesamt", 200, y, { align: "right" });
+    y += 6;
+    doc.setLineWidth(0.5);
+    doc.line(14, y, 200, y);
+    y += 6;
+
+    entries.forEach(entry => {
+        const player = this.state.players.find(p => p.id === entry.playerId);
+        const playerName = player ? player.name : "Unbekannt";
+        const originalTotal = this.calculateEntryTotal(entry);
+        const finalTotal = this.calculateFinalPriceWithFee(originalTotal);
+        const paidStatus = entry.paid ? "Bezahlt" : "Offen";
+
+        rawTotal += originalTotal;
+        feeTotal += finalTotal - originalTotal;
+        grandTotal += finalTotal;
+
+        const details = entry.items.map(item => {
+            const drink = this.state.drinks.find(d => d.id === item.drinkId);
+            return `${item.quantity}x ${drink ? drink.name : "Unbekannt"}`;
+        }).join(", ");
+
+        doc.setFontSize(11);
+        doc.text(playerName, 14, y);
+        doc.text(details, 60, y);
+        doc.text(paidStatus, 150, y);
+        doc.text(`${finalTotal.toFixed(2)} €`, 200, y, { align: "right" });
+        y += 8;
+
+        if (y > 270) {
+            doc.addPage();
+            y = 20;
+        }
+    });
+
+    y += 10;
+    doc.setFontSize(12);
+    doc.line(14, y, 200, y);
+    y += 6;
+    doc.text(`Zwischensumme: ${rawTotal.toFixed(2)} €`, 14, y);
+    y += 6;
+    doc.text(`Zettle-Gebühr (${zettlePercent}%): ${feeTotal.toFixed(2)} €`, 14, y);
+    y += 6;
+    doc.text(`Gesamtsumme (inkl. Gebühr): ${grandTotal.toFixed(2)} €`, 14, y);
+
+    doc.save(`Abrechnung_${selectedDate}.pdf`);
+},
+
+async generateCancelledEntriesPDF() {
+    const selectedDate = this.dom.exportDate.value;
+    if (!selectedDate) {
+        alert("Bitte wählen Sie ein Datum für die Abrechnung aus.");
+        return;
+    }
+
+    const cancelledEntries = this.state.entries.filter(entry =>
+        entry.date === selectedDate && entry.cancelled
+    );
+
+    if (cancelledEntries.length === 0) {
+        alert("Keine stornierten Einträge für dieses Datum.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    let y = 20;
+
+    doc.setFont("helvetica");
+    doc.setFontSize(14);
+    doc.text(`Stornierte Einträge - ${new Date(selectedDate).toLocaleDateString('de-DE')}`, 14, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.text("Spieler", 14, y);
+    doc.text("Details", 60, y);
+    doc.text("Status", 150, y);
+    doc.text("Datum", 200, y, { align: "right" });
+    y += 6;
+    doc.setLineWidth(0.5);
+    doc.line(14, y, 200, y);
+    y += 6;
+
+    cancelledEntries.forEach(entry => {
+        const player = this.state.players.find(p => p.id === entry.playerId);
+        const playerName = player ? player.name : "Unbekannt";
+        const paidStatus = entry.paid ? "Bezahlt" : "Offen";
+
+        const details = entry.items.map(item => {
+            const drink = this.state.drinks.find(d => d.id === item.drinkId);
+            return `${item.quantity}x ${drink ? drink.name : "Unbekannt"}`;
+        }).join(", ");
+
+        const entryDate = new Date(entry.date).toLocaleDateString('de-DE');
+
+        doc.setFontSize(11);
+        doc.text(playerName, 14, y);
+        doc.text(details, 60, y);
+        doc.text(paidStatus, 150, y);
+        doc.text(entryDate, 200, y, { align: "right" });
+        y += 8;
+
+        if (y > 270) {
+            doc.addPage();
+            y = 20;
+        }
+    });
+
+    doc.save(`Stornierte_Eintraege_${selectedDate}.pdf`);
+},
+
+async savePdf(doc, fileName) {
+    const isCapacitor = !!window.Capacitor?.isNativePlatform?.();
+
+    if (isCapacitor) {
+        const base64 = doc.output('datauristring').split(',')[1];
+
+        try {
+            await window.Capacitor.Plugins.DownloadHelper.saveBase64Pdf({
+                base64,
+                fileName,
+            });
+            alert("PDF wird im Speicher des Geräts gespeichert.");
+        } catch (err) {
+            console.error("Fehler beim Speichern der PDF:", err);
+            alert("Fehler beim Speichern der PDF.");
+        }
+    } else {
+        savePdf(doc, fileName); // fallback for web
+    }
+},
+
+                handleTabClick(e) {
+                    const clickedTabId = e.currentTarget.id;
+                    const targetContentId = clickedTabId.replace('tab-', 'content-');
+                    
+                    if (targetContentId === 'content-settings' && !this.state.isAdmin) {
+                        alert("Sie müssen als Administrator angemeldet sein, um auf die Einstellungen zugreifen zu können.");
+                        return;
+                    }
+
+                    this.state.activeContentId = targetContentId;
+                    this.renderTabContentVisibility();
+                    this.handleTabStyling(e.currentTarget);
+                }
+            };
+
+            app.init();
+        }); // End of DOMContentLoaded
+    </script>
+</body>
+</html>
+
+
+
 
