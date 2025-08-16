@@ -701,8 +701,17 @@
                         }
                     });
 
+                    document.querySelectorAll(".reset-option-btn").forEach(btn => {
+    btn.addEventListener("click", () => this.resetDatabase(btn.dataset.type));
+});
+document.getElementById("close-reset-modal").addEventListener("click", () => {
+    document.getElementById("reset-modal").style.display = "none";
+});
+
                     this.dom.saveStateBtn.addEventListener('click', () => this.saveState());
-                    this.dom.resetDbBtn.addEventListener('click', () => this.resetDatabase());
+                    this.dom.resetDbBtn.addEventListener('click', () => {
+                        document.getElementById("reset-modal").style.display = "flex";
+                    });
                     this.dom.zettleFeeInput.addEventListener('input', () => this.updateZettleFee());
 
                     // Admin Modal Events
@@ -904,71 +913,54 @@ async saveState() {
 },
 
 async resetDatabase() {
-     // Show popup when reset button is clicked
-    this.dom.resetDbBtn.addEventListener("click", () => {
-        document.getElementById("reset-modal").style.display = "flex";
-    });
+     if (!this.state.isAdmin) {
+        alert("Nur Administratoren dürfen die Datenbank zurücksetzen.");
+        return;
+    }
 
-    // Close popup
-    document.getElementById("close-reset-modal").addEventListener("click", () => {
-        document.getElementById("reset-modal").style.display = "none";
-    });
+    if (!this.state.isAuthReady || !this.firebase.db) {
+        alert("Firebase ist nicht bereit. Bitte laden Sie die Seite neu.");
+        return;
+    }
 
-    // Handle reset choice (attach once only)
-    document.querySelectorAll(".reset-option-btn").forEach(btn => {
-        btn.onclick = async () => {
-            const type = btn.dataset.type;
+    const confirmed = confirm("⚠️ Sind Sie sicher? Dies kann nicht rückgängig gemacht werden!");
+    if (!confirmed) return;
 
-            if (!this.state.isAdmin) {
-                alert("Nur Administratoren dürfen die Datenbank zurücksetzen.");
-                return;
-            }
+    try {
+        const docPath = `artifacts/${this.firebase.appId}/public/data/dartClubSharedData/current`;
+        const docRef = window.firebase.doc(this.firebase.db, docPath);
 
-            if (!this.state.isAuthReady || !this.firebase.db) {
-                alert("Firebase ist nicht bereit. Bitte laden Sie die Seite neu.");
-                return;
-            }
+        let newState = { ...this.state };
 
-            const confirmed = confirm("⚠️ Sind Sie sicher? Dies kann nicht rückgängig gemacht werden!");
-            if (!confirmed) return;
+        if (type === "entries") newState.entries = [];
+        if (type === "drinks") newState.drinks = [];
+        if (type === "players") newState.players = [];
+        if (type === "all") {
+            newState = {
+                players: [],
+                drinks: [],
+                entries: [],
+                nextPlayerId: 1,
+                nextDrinkId: 1,
+                nextEntryId: 1,
+                zettleFeePercentage: 0.0139,
+                isAdmin: false,
+                isAuthReady: true,
+                activeContentId: 'content-dashboard'
+            };
+        }
 
-            try {
-                const docPath = `artifacts/${this.firebase.appId}/public/data/dartClubSharedData/current`;
-                const docRef = window.firebase.doc(this.firebase.db, docPath);
+        await window.firebase.setDoc(docRef, newState);
+        alert("✅ Datenbank erfolgreich zurückgesetzt!");
+        this.state = { ...this.state, ...newState };
+        this.render();
 
-                let newState = { ...this.state };
+    } catch (error) {
+        console.error("Fehler beim Zurücksetzen:", error);
+        alert("❌ Fehler: " + error.message);
+    }
 
-                if (type === "entries") newState.entries = [];
-                if (type === "drinks") newState.drinks = [];
-                if (type === "players") newState.players = [];
-                if (type === "all") {
-                    newState = {
-                        players: [],
-                        drinks: [],
-                        entries: [],
-                        nextPlayerId: 1,
-                        nextDrinkId: 1,
-                        nextEntryId: 1,
-                        zettleFeePercentage: 0.0139,
-                        isAdmin: false,
-                        isAuthReady: true,
-                        activeContentId: 'content-dashboard'
-                    };
-                }
-
-                await window.firebase.setDoc(docRef, newState);
-                alert("✅ Datenbank erfolgreich zurückgesetzt!");
-                this.state = { ...this.state, ...newState };
-                this.render();
-
-            } catch (error) {
-                console.error("Fehler beim Zurücksetzen:", error);
-                alert("❌ Fehler: " + error.message);
-            }
-
-            document.getElementById("reset-modal").style.display = "none";
-        };
-    });
+    document.getElementById("reset-modal").style.display = "none";
 },
 
                 showSaveMessage() {
@@ -1706,7 +1698,5 @@ async savePdf(doc, fileName) {
     </script>
 </body>
 </html>
-
-
 
 
